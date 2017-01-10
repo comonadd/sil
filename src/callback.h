@@ -2,6 +2,7 @@
 /* Creation Date: 2017-01-10*/
 /* Creator: Dmitry Guzeev <dmitry.guzeev@yahoo.com> */
 /* Description: */
+/* SIL callback API and default SIL callbacks */
 
 #ifndef CALLBACK_H
 #define CALLBACK_H
@@ -21,5 +22,9 @@ SILCallbackStatus __handle_ctrl_C_key(struct SILState* ss);
 bool sil_key_is_binded(
     struct SILState* ss,
     uint16 key);
+bool sil_bind_key(
+    struct SILState* ss,
+    uint16 key,
+    SILCallbackStatus(*callback)(struct SILState*));
 
 #endif // CALLBACK_H

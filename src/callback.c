@@ -2,6 +2,7 @@
 /* Creation Date: 2017-01-10*/
 /* Creator: Dmitry Guzeev <dmitry.guzeev@yahoo.com> */
 /* Description: */
+/* SIL callback API and default SIL callbacks */
 
 #include "callback.h"
 
@@ -88,4 +89,13 @@ bool sil_key_is_binded(
 {
     if (key >= SIL_MAX_CALLBACKS) return false;
     return ss->config.callbacks[key];
+}
+
+bool sil_bind_key(
+    struct SILState* ss,
+    uint16 key,
+    SILCallbackStatus(*callback)(struct SILState*))
+{
+    if (key >= SIL_MAX_CALLBACKS) return false;
+    ss->config.callbacks[key] = callback;
 }

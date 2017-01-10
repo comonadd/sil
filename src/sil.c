@@ -261,15 +261,6 @@ bool sil_deinit(struct SILState* ss)
     restore_term(ss);
 }
 
-bool sil_bind_key(
-    struct SILState* ss,
-    uint16 key,
-    SILCallbackStatus(*callback)(struct SILState*))
-{
-    if (key >= SIL_MAX_CALLBACKS) return false;
-    ss->config.callbacks[key] = callback;
-}
-
 char* sil_read(struct SILState* ss)
 {
     int res;
@@ -280,7 +271,6 @@ char* sil_read(struct SILState* ss)
 	res = read(ss->ifd, &key, 1);
 	if (res == 0) continue;
 	if (res == -1) return NULL;
-
 	if (sil_key_is_binded(ss, key)) {
 	    cs = ss->config.callbacks[key](ss);
 	    switch (cs) {
