@@ -17,9 +17,6 @@
 #include "buffer.h"
 #include "callback.h"
 
-#define SIL_HISTORY_INITIAL_CAPACITY 32
-#define SIL_HISTORY_GROW_RATE 32
-
 enum SILErrno sil_errno = SIL_OK;
 
 static struct termios saved_termios;
@@ -129,7 +126,7 @@ NoRet sil_history_next(struct SILState* ss)
 	sil_history_grow(&ss->history);
     ++ss->history_pos;
     ss->buffer = ss->history.items[ss->history_pos];
-    sil_move_cursor_to_end(ss);
+    sil_move_cursor_pos_to_end(ss);
 }
 
 NoRet sil_history_prev(struct SILState* ss)
@@ -137,37 +134,48 @@ NoRet sil_history_prev(struct SILState* ss)
     if (ss->history_pos == 0) return;
     --ss->history_pos;
     ss->buffer = ss->history.items[ss->history_pos];
-    sil_move_cursor_to_end(ss);
+    sil_move_cursor_pos_to_end(ss);
+}
+
+/***************/
+/* Completions */
+/***************/
+
+bool sil_add_completion(
+    struct SILState* ss,
+    const char const* complete_from,
+    const char const* complete_to)
+{
+    ss->completion_froms[ss->completions_count] = complete_from;
+    ss->completion_tos[ss->completions_count] = complete_to;
+    ++ss->completions_count;
+    return true;
 }
 
 /**********/
 /* Cursor */
 /**********/
 
-NoRet sil_move_cursor_left(struct SILState* ss)
+NoRet sil_move_cursor_pos_left(struct SILState* ss)
 {
     if (ss->cursor_pos == 0) return;
     --ss->cursor_pos;
-    sil_refresh(ss);
 }
 
-NoRet sil_move_cursor_right(struct SILState* ss)
+NoRet sil_move_cursor_pos_right(struct SILState* ss)
 {
     if (ss->cursor_pos >= ss->buffer->len) return;
     ++ss->cursor_pos;
-    sil_refresh(ss);
 }
 
-NoRet sil_move_cursor_to_beg(struct SILState* ss)
+NoRet sil_move_cursor_pos_to_beg(struct SILState* ss)
 {
     ss->cursor_pos = 0;
-    sil_refresh(ss);
 }
 
-NoRet sil_move_cursor_to_end(struct SILState* ss)
+NoRet sil_move_cursor_pos_to_end(struct SILState* ss)
 {
     ss->cursor_pos = ss->buffer->len;
-    sil_refresh(ss);
 }
 
 /********/
@@ -184,7 +192,7 @@ bool sil_clear_screen(struct SILState* ss)
 	return false;
 
     /* Appending prompt */
-    if (!buf_append(&buf, ss->config.prompt, ss->config.prompt_len))
+    if (!buf_append(&buf, ss->config.prompt, ss->prompt_len))
 	return false;
 
     /* Appending current buffer value */
@@ -204,7 +212,7 @@ bool sil_refresh(struct SILState* ss)
     if (!buf_append_ch(&buf, CR_CH)) return false;
 
     /* Appending prompt */
-    if (!buf_append(&buf, ss->config.prompt, ss->config.prompt_len))
+    if (!buf_append(&buf, ss->config.prompt, ss->prompt_len))
 	return false;
 
     /* Appending current buffer value */
@@ -220,7 +228,7 @@ bool sil_refresh(struct SILState* ss)
     snprintf(
 	seq, 64,
 	"\r\x1b[%dC",
-	ss->config.prompt_len + ss->cursor_pos);
+	ss->prompt_len + ss->cursor_pos);
     if (!buf_append(&buf, seq, strlen(seq)))
 	return false;
     write(ss->ofd, buf.val, buf.len + 1);
@@ -237,13 +245,17 @@ bool sil_init(
     ss->history_pos = 0;
     ss->buffer = ss->history.items[0];
     ss->config.prompt = prompt;
-    ss->config.prompt_len = strlen(prompt);
+    ss->prompt_len = strlen(prompt);
     for (uint16 i = 0; i < SIL_MAX_CALLBACKS; ++i)
 	ss->config.callbacks[i] = NULL;
-    sil_move_cursor_to_beg(ss);
+    sil_move_cursor_pos_to_beg(ss);
     ss->ifd = 0;
     ss->ofd = 1;
     if (!init_term(ss)) return false;
+
+    ss->completion_froms = malloc(64 * sizeof(char*));
+    ss->completion_tos = malloc(64 * sizeof(char*));
+    ss->completions_count = 0;
 
     sil_bind_key(ss, KC_ENTER, __handle_enter_key);
     sil_bind_key(ss, KC_TAB, __handle_tab_key);

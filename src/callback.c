@@ -14,13 +14,19 @@
 
 SILCallbackStatus __handle_enter_key(struct SILState* ss)
 {
-    if (ss->buffer->len == 0)
-	return SILCS_CONTINUE;
+    if (ss->buffer->len == 0) {
+	ss->res = NULL;
+	return SILCS_RET_RES;
+    }
+
+    /* Allocating the "result" string and copying the */
+    /* contents of a curernt buffer to it */
     ss->res = malloc(ss->buffer->len * sizeof(char));
     memcpy(ss->res, ss->buffer->val, ss->buffer->len);
     ss->res[ss->buffer->len] = ZERO_CH;
+
     sil_refresh(ss);
-    write(ss->ofd, CRLF, 2);
+    write(ss->ofd, "\r\n", 2);
     sil_history_next(ss);
     return SILCS_RET_RES;
 }
@@ -28,6 +34,22 @@ SILCallbackStatus __handle_enter_key(struct SILState* ss)
 /* TODO: Completion */
 SILCallbackStatus __handle_tab_key(struct SILState* ss)
 {
+    /* For each completion in the array of completions */
+    for (uint64 i = 0; i < ss->completions_count; ++i) {
+	/* If current buffer from length 0 to the length */
+	/* of completion is not equal to the completion, */
+	/* continue to search */
+	for (uint64 j = 0; j < ss->buffer->len; ++j)
+	    if (ss->buffer->val[j] != ss->completion_froms[i][j])
+		continue;
+	/* Go to the next item in the history */
+	sil_history_next(ss);
+	/* Copy the value from the array of completions values to the current buffer */
+	buf_set(ss->buffer, ss->completion_tos[i], strlen(ss->completion_tos[i]));
+	sil_move_cursor_pos_to_end(ss);
+	sil_refresh(ss);
+	return SILCS_CONTINUE;
+    }
     return SILCS_CONTINUE;
 }
 
@@ -55,15 +77,19 @@ SILCallbackStatus __handle_esc_key(struct SILState* ss)
     switch (seq[1]) {
 	case 'A':;
 	    sil_history_prev(ss);
+	    sil_refresh(ss);
 	    break;
 	case 'B':
 	    sil_history_next(ss);
+	    sil_refresh(ss);
 	    break;
 	case 'D':
-	    sil_move_cursor_left(ss);
+	    sil_move_cursor_pos_left(ss);
+	    sil_refresh(ss);
 	    break;
 	case 'C':
-	    sil_move_cursor_right(ss);
+	    sil_move_cursor_pos_right(ss);
+	    sil_refresh(ss);
 	    break;
 	default: PASS();
     }

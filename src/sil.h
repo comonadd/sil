@@ -11,14 +11,15 @@
 #include "types.h"
 #include "buffer.h"
 
+#define SIL_HISTORY_INITIAL_CAPACITY 32
+#define SIL_HISTORY_GROW_RATE 32
 #define SIL_MAX_CALLBACKS 256
 
-typedef enum SILCallbackStatus {
-    SILCS_CONTINUE,
-    SILCS_ERROR,
-    SILCS_RET_RES
-} SILCallbackStatus;
-
+/**
+   $ Description:
+   #   This enumeration represents a key codes that SHOULD
+   #   be used in order to bind a callback
+**/
 enum KeyCode {
     KC_CTRL_C = 3,
     KC_CTRL_L = 12,
@@ -27,6 +28,20 @@ enum KeyCode {
     KC_BACKSPACE = 127,
     KC_TAB = 9
 };
+
+/**
+   $ Description:
+   #   This enumeration represents return value of a callback
+   #   and says "what to do" after callback execution
+   @SILCS_CONTINUE - should continue ask for input
+   @SILCS_ERROR - should report about error and return NULL
+   @SILCS_RET_RES - should "res" field of a SIL state
+**/
+typedef enum SILCallbackStatus {
+    SILCS_CONTINUE,
+    SILCS_ERROR,
+    SILCS_RET_RES
+} SILCallbackStatus;
 
 enum SILErrno {
     SIL_OK,
@@ -47,28 +62,33 @@ struct SILHistory {
    @buffer - current buffer in history
    @config - configuration
    @history - history of a input
+   @config - configuration
    @ifd - terminal input file descriptor
    @ofd - terminal output file descriptor
    @cursor_pos - current cursor position in the buffer
    @history_pos - current position in the history
+   @res - thing that callbacks should change if they want to,
+	  this thing will be returned if callback said "SILCS_RET_RES!"
 **/
 struct SILState {
     struct Buffer* buffer;
-    struct SILConfig {
+    struct {
 	char const* prompt;
-	uint8 prompt_len;
 	SILCallbackStatus (*callbacks[SIL_MAX_CALLBACKS])(struct SILState*);
     } config;
     struct SILHistory history;
+    uint64 completions_count;
+    char* res;
+    char const** completion_tos;
+    char const** completion_froms;
     int ifd;
     int ofd;
     uint16 cursor_pos;
     uint16 history_pos;
-    char* res;
+    uint8 prompt_len;
 };
 
 extern enum SILErrno sil_errno;
-
 
 /***********/
 /* History */
@@ -113,6 +133,14 @@ NoRet sil_history_next(struct SILState* ss);
 **/
 NoRet sil_history_prev(struct SILState* ss);
 
+/***************/
+/* Completions */
+/***************/
+
+bool sil_add_completion(
+    struct SILState* ss,
+    const char const* complete_from,
+    const char const* complete_to);
 
 /**********/
 /* Cursor */
@@ -124,7 +152,7 @@ NoRet sil_history_prev(struct SILState* ss);
    $ Return value:
    #   This function always succeeds
 **/
-NoRet sil_move_cursor_left(struct SILState* ss);
+NoRet sil_move_cursor_pos_left(struct SILState* ss);
 
 /**
    $ Description:
@@ -132,7 +160,7 @@ NoRet sil_move_cursor_left(struct SILState* ss);
    $ Return value:
    #   This function always succeeds
 **/
-NoRet sil_move_cursor_right(struct SILState* ss);
+NoRet sil_move_cursor_pos_right(struct SILState* ss);
 
 /**
    $ Description:
@@ -140,7 +168,7 @@ NoRet sil_move_cursor_right(struct SILState* ss);
    $ Return value:
    #   This function always succeeds
 **/
-NoRet sil_move_cursor_to_beg(struct SILState* ss);
+NoRet sil_move_cursor_pos_to_beg(struct SILState* ss);
 
 /**
    $ Description:
@@ -148,7 +176,7 @@ NoRet sil_move_cursor_to_beg(struct SILState* ss);
    $ Return value:
    #   This function always succeeds
 **/
-NoRet sil_move_cursor_to_end(struct SILState* ss);
+NoRet sil_move_cursor_pos_to_end(struct SILState* ss);
 
 /********/
 /* Main */
@@ -199,20 +227,6 @@ bool sil_deinit(struct SILState* ss);
    #   Returns true if succeeds, false otherwise
 **/
 char* sil_read(struct SILState* ss);
-
-/**
-   $ Description:
-   #   This function binds given key to a given callback
-   $ Return value:
-   #   If succeeds, returns true
-   #   If given key is too big, returns false
-   @key - key to bind
-   @callback - callback to bind to
-**/
-bool sil_bind_key(
-    struct SILState* ss,
-    uint16 key,
-    SILCallbackStatus (*callback)(struct SILState*));
 
 #if TEST
 NoRet test_sil(void);
