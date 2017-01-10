@@ -31,24 +31,34 @@ SILCallbackStatus __handle_enter_key(struct SILState* ss)
     return SILCS_RET_RES;
 }
 
-/* TODO: Completion */
 SILCallbackStatus __handle_tab_key(struct SILState* ss)
 {
-    /* For each completion in the array of completions */
-    for (uint64 i = 0; i < ss->completions_count; ++i) {
-	/* If current buffer from length 0 to the length */
-	/* of completion is not equal to the completion, */
-	/* continue to search */
-	for (uint64 j = 0; j < ss->buffer->len; ++j)
-	    if (ss->buffer->val[j] != ss->completion_froms[i][j])
-		continue;
+    uint64 i = 0;
+    /* For each "completion from" in the array */
+    while (i < ss->completions_count) {
+	/* If length of current buffer value is greater than the "completion from" length: */
+	if (strcmp(ss->buffer->val, ss->completion_froms[i])) {
+	    goto next_completion;
+	}
+	/* For each character in the buffer value: */
+	for (uint64 j = 0; j < ss->buffer->len; ++j) {
+	    /* If current buffer character not equals to the current "completion from" character: */
+	    if (ss->buffer->val[j] != ss->completion_froms[i][j]) {
+		goto next_completion;
+	    }
+	}
+	/* We found it!!! */
+
 	/* Go to the next item in the history */
 	sil_history_next(ss);
+
 	/* Copy the value from the array of completions values to the current buffer */
 	buf_set(ss->buffer, ss->completion_tos[i], strlen(ss->completion_tos[i]));
 	sil_move_cursor_pos_to_end(ss);
 	sil_refresh(ss);
 	return SILCS_CONTINUE;
+    next_completion:
+	++i;
     }
     return SILCS_CONTINUE;
 }

@@ -78,6 +78,7 @@ struct SILState {
     } config;
     struct SILHistory history;
     uint64 completions_count;
+    uint64 completions_size;
     char* res;
     char const** completion_tos;
     char const** completion_froms;

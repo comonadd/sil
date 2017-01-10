@@ -146,6 +146,11 @@ bool sil_add_completion(
     const char const* complete_from,
     const char const* complete_to)
 {
+    if (ss->completions_count >= ss->completions_size) {
+	ss->completions_size += 64;
+	ss->completion_froms = realloc(ss->completion_froms, ss->completions_size);
+	ss->completion_tos = realloc(ss->completion_tos, ss->completions_size);
+    }
     ss->completion_froms[ss->completions_count] = complete_from;
     ss->completion_tos[ss->completions_count] = complete_to;
     ++ss->completions_count;
@@ -253,9 +258,10 @@ bool sil_init(
     ss->ofd = 1;
     if (!init_term(ss)) return false;
 
-    ss->completion_froms = malloc(64 * sizeof(char*));
-    ss->completion_tos = malloc(64 * sizeof(char*));
+    ss->completions_size = 64;
     ss->completions_count = 0;
+    ss->completion_froms = malloc(ss->completions_size * sizeof(char*));
+    ss->completion_tos = malloc(ss->completions_size * sizeof(char*));
 
     sil_bind_key(ss, KC_ENTER, __handle_enter_key);
     sil_bind_key(ss, KC_TAB, __handle_tab_key);
