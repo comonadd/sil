@@ -10,24 +10,9 @@
 
 #include "types.h"
 #include "buffer.h"
+#include "history.h"
 
-#define SIL_HISTORY_INITIAL_CAPACITY 32
-#define SIL_HISTORY_GROW_RATE 32
 #define SIL_MAX_CALLBACKS 256
-
-/**
-   $ Description:
-   #   This enumeration represents a key codes that SHOULD
-   #   be used in order to bind a callback
-**/
-enum KeyCode {
-    KC_CTRL_C = 3,
-    KC_CTRL_L = 12,
-    KC_ENTER = 13,
-    KC_ESC = 27,
-    KC_BACKSPACE = 127,
-    KC_TAB = 9
-};
 
 /**
    $ Description:
@@ -46,15 +31,6 @@ typedef enum SILCallbackStatus {
 enum SILErrno {
     SIL_OK,
     SIL_BAD
-};
-
-/**
-   @items - items of history
-   @size - count of items that we allocated buffers for
-**/
-struct SILHistory {
-    struct Buffer** items;
-    uint16 size;
 };
 
 /**
@@ -84,45 +60,26 @@ struct SILState {
     char const** completion_froms;
     int ifd;
     int ofd;
+    uint32 prompt_len;
+    uint32 prompt_actual_len;
     uint16 cursor_pos;
     uint16 history_pos;
-    uint8 prompt_len;
 };
 
 extern enum SILErrno sil_errno;
 
+/***************/
+/* Completions */
+/***************/
+
+bool sil_add_completion(
+    struct SILState* ss,
+    const char const* complete_from,
+    const char const* complete_to);
+
 /***********/
 /* History */
 /***********/
-
-/**
-   $ Description:
-   #   This function grows the array of items of the history
-   $ Return value:
-   #   Returns true if succeeds
-   #   Returns false only if there is no enough memory
-**/
-bool sil_history_grow(struct SILHistory* sh);
-
-/**
-   $ Description:
-   #   This function initializes history and
-   #   initializes all the buffers in it
-   $ Return value:
-   #   Returns true if succeeds
-   #   Returns false if there is not enough memory
-**/
-bool sil_history_init(struct SILHistory* sh);
-
-/**
-   $ Description:
-   #   This function deinitializes the history,
-   #   and frees all the buffers in it
-   $ Return value:
-   #   Always succeeds, so there is no reasons to return
-   #   anything
-**/
-NoRet sil_history_deinit(struct SILHistory* sh);
 
 /**
    $ Description:
@@ -133,15 +90,6 @@ NoRet sil_history_next(struct SILState* ss);
    $ Description:
 **/
 NoRet sil_history_prev(struct SILState* ss);
-
-/***************/
-/* Completions */
-/***************/
-
-bool sil_add_completion(
-    struct SILState* ss,
-    const char const* complete_from,
-    const char const* complete_to);
 
 /**********/
 /* Cursor */
@@ -197,7 +145,7 @@ bool sil_clear_screen(struct SILState* ss);
    $ Return value:
    #   Always succeeds
 **/
-bool sil_refresh(struct SILState* ss);
+bool sil_refresh_line(struct SILState* ss);
 
 /**
    $ Description:
@@ -219,13 +167,13 @@ bool sil_deinit(struct SILState* ss);
 
 /**
    $ Description:
-   #   This function initializes the Simple Input Library structure
+   #   This function reads a line from the user
    $ Input:
    #   nothing
    $ Output:
    #   line that user has entered
    $ Return value:
-   #   Returns true if succeeds, false otherwise
+   #   Returns line if succeeds, NULL otherwise
 **/
 char* sil_read(struct SILState* ss);
 

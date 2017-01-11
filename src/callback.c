@@ -12,6 +12,29 @@
 #include "macros.h"
 #include "sil.h"
 
+bool sil_key_is_binded(
+    struct SILState* ss,
+    uint16 key)
+{
+    if (key >= SIL_MAX_CALLBACKS)
+	return false;
+    return ss->config.callbacks[key];
+}
+
+bool sil_bind_key(
+    struct SILState* ss,
+    uint16 key,
+    SILCallbackStatus(*callback)(struct SILState*))
+{
+    if (key >= SIL_MAX_CALLBACKS)
+	return false;
+    ss->config.callbacks[key] = callback;
+}
+
+/*********************/
+/* Default callbacks */
+/*********************/
+
 SILCallbackStatus __handle_enter_key(struct SILState* ss)
 {
     if (ss->buffer->len == 0) {
@@ -25,8 +48,8 @@ SILCallbackStatus __handle_enter_key(struct SILState* ss)
     memcpy(ss->res, ss->buffer->val, ss->buffer->len);
     ss->res[ss->buffer->len] = ZERO_CH;
 
-    sil_refresh(ss);
-    write(ss->ofd, "\r\n", 2);
+    sil_refresh_line(ss);
+    write(ss->ofd, CRLF, 2);
     sil_history_next(ss);
     return SILCS_RET_RES;
 }
@@ -36,17 +59,15 @@ SILCallbackStatus __handle_tab_key(struct SILState* ss)
     uint64 i = 0;
     /* For each "completion from" in the array */
     while (i < ss->completions_count) {
-	/* If length of current buffer value is greater than the "completion from" length: */
-	if (strcmp(ss->buffer->val, ss->completion_froms[i])) {
+	/* If length of current buffer value is greater than the */
+	/* current "completion from" length: */
+	if (strcmp(ss->buffer->val, ss->completion_froms[i]))
 	    goto next_completion;
-	}
 	/* For each character in the buffer value: */
-	for (uint64 j = 0; j < ss->buffer->len; ++j) {
+	for (uint64 j = 0; j < ss->buffer->len; ++j)
 	    /* If current buffer character not equals to the current "completion from" character: */
-	    if (ss->buffer->val[j] != ss->completion_froms[i][j]) {
+	    if (ss->buffer->val[j] != ss->completion_froms[i][j])
 		goto next_completion;
-	    }
-	}
 	/* We found it!!! */
 
 	/* Go to the next item in the history */
@@ -55,7 +76,7 @@ SILCallbackStatus __handle_tab_key(struct SILState* ss)
 	/* Copy the value from the array of completions values to the current buffer */
 	buf_set(ss->buffer, ss->completion_tos[i], strlen(ss->completion_tos[i]));
 	sil_move_cursor_pos_to_end(ss);
-	sil_refresh(ss);
+	sil_refresh_line(ss);
 	return SILCS_CONTINUE;
     next_completion:
 	++i;
@@ -65,12 +86,17 @@ SILCallbackStatus __handle_tab_key(struct SILState* ss)
 
 SILCallbackStatus __handle_backspace_key(struct SILState* ss)
 {
+    /* If we have nothing to erase, just don't do it */
     if (ss->buffer->len == 0)
 	return SILCS_CONTINUE;
+
+    /* Erasing one character from buffer */
     --ss->buffer->len;
-    --ss->cursor_pos;
+    sil_move_cursor_pos_left(ss);
     ss->buffer->val[ss->buffer->len] = ZERO_CH;
-    sil_refresh(ss);
+
+    /* Refreshing the line to show that we done */
+    sil_refresh_line(ss);
     return SILCS_CONTINUE;
 }
 
@@ -86,20 +112,24 @@ SILCallbackStatus __handle_esc_key(struct SILState* ss)
     if (res == 0) return SILCS_CONTINUE;
     switch (seq[1]) {
 	case 'A':;
+	    /* UP Arrow */
 	    sil_history_prev(ss);
-	    sil_refresh(ss);
+	    sil_refresh_line(ss);
 	    break;
 	case 'B':
+	    /* DOWN Arrow */
 	    sil_history_next(ss);
-	    sil_refresh(ss);
+	    sil_refresh_line(ss);
 	    break;
 	case 'D':
+	    /* LEFT Arrow */
 	    sil_move_cursor_pos_left(ss);
-	    sil_refresh(ss);
+	    sil_refresh_line(ss);
 	    break;
 	case 'C':
+	    /* RIGHT Arrow */
 	    sil_move_cursor_pos_right(ss);
-	    sil_refresh(ss);
+	    sil_refresh_line(ss);
 	    break;
 	default: PASS();
     }
@@ -114,24 +144,8 @@ SILCallbackStatus __handle_ctrl_L_key(struct SILState* ss)
 
 SILCallbackStatus __handle_ctrl_C_key(struct SILState* ss)
 {
+    write(ss->ofd, "\n", 1);
     sil_deinit(ss);
     exit(0);
     return SILCS_CONTINUE;
-}
-
-bool sil_key_is_binded(
-    struct SILState* ss,
-    uint16 key)
-{
-    if (key >= SIL_MAX_CALLBACKS) return false;
-    return ss->config.callbacks[key];
-}
-
-bool sil_bind_key(
-    struct SILState* ss,
-    uint16 key,
-    SILCallbackStatus(*callback)(struct SILState*))
-{
-    if (key >= SIL_MAX_CALLBACKS) return false;
-    ss->config.callbacks[key] = callback;
 }

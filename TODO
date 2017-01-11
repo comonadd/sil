@@ -1,0 +1,2 @@
+Make so that unsupported terminals work too
+Add built-in callbacks for HOME and END keys

@@ -5,9 +5,9 @@
 SRC := $(shell find . -type f -name '*.c')
 OBJ := $(SRC:.c=.o)
 
-all: $(LIB_PATH)
+all: $(LIB_NAME)
 
-$(LIB_PATH): $(OBJ)
+$(LIB_NAME): $(OBJ)
 	@echo -e $(YELLOW_CLR) "AR " $(GRAY_CLR) $@ $(RESET_CLR)
 	@ar -rcs $@ $^
 

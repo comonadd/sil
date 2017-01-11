@@ -11,6 +11,7 @@
 
 int main(int argc, char** argv)
 {
+    /* Stuff to test library */
     if (argc > 1) {
 	uint16 i = 1;
 	while (argv[i]) {
@@ -28,7 +29,7 @@ int main(int argc, char** argv)
     }
 
     struct SILState ss;
-    sil_init(&ss, ">> ");
+    sil_init(&ss, "\033[38;5;226m>>\033[0m ");
     char* line;
     do {
 	line = sil_read(&ss);

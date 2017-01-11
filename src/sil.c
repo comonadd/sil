@@ -10,114 +10,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <termios.h>
 
 #include "types.h"
 #include "macros.h"
 #include "buffer.h"
 #include "callback.h"
+#include "terminal.h"
 
 enum SILErrno sil_errno = SIL_OK;
 
-static struct termios saved_termios;
-
-static bool init_term(struct SILState* ss);
-static bool restore_term(struct SILState* ss);
-
-/************/
-/* Terminal */
-/************/
-
-/**
-   $ Description:
-   #   This function initializes the "raw" terminal
-**/
-static bool init_term(struct SILState* ss)
-{
-    if (!isatty(STDIN_FILENO)) goto fatal;
-    if (tcgetattr(ss->ifd, &saved_termios) == -1) goto fatal;
-
-    struct termios curr_termios;
-    curr_termios = saved_termios;
-
-    /* input modes: no break, no CR to NL, no parity check, no strip char,
-     * no start/stop output control. */
-    curr_termios.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    /* output modes - disable post processing */
-    curr_termios.c_oflag &= ~(OPOST);
-    /* control modes - set 8 bit chars */
-    curr_termios.c_cflag |= (CS8);
-    /* local modes - choing off, canonical off, no extended functions,
-     * no signal chars (^Z,^C) */
-    curr_termios.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-    /* control chars - set return condition: min number of bytes and timer.
-     * We want read to return every single byte, without timeout. */
-    /* 1 byte, no timer */
-    curr_termios.c_cc[VMIN] = 1; curr_termios.c_cc[VTIME] = 0;
-
-    /* put terminal in raw mode after flushing */
-    if (tcsetattr(ss->ifd, TCSAFLUSH, &curr_termios) < 0)
-	goto fatal;
-
-    return true;
-
-fatal:
-    errno = ENOTTY;
-    return false;
-}
-
-/**
-   $ Description:
-   #   This function restores the configuration of a terminal
-   #   to the configuration that it had before we changed it
-**/
-static bool restore_term(struct SILState* ss)
-{
-    tcsetattr(ss->ifd, TCSAFLUSH, &saved_termios);
-    return true;
-}
-
-/***********/
-/* History */
-/***********/
-
-bool sil_history_grow(struct SILHistory* sh)
-{
-    DEBUG_ASSERT(sh, "");
-    uint16 old_size = sh->size;
-    sh->size += SIL_HISTORY_GROW_RATE;
-    sh->items = realloc(sh->items, sh->size * sizeof(struct Buffer));
-    if (!sh->items) return false;
-    for (uint16 i = (old_size - 1); i < sh->size; ++i) {
-	sh->items[i] = malloc(sizeof(struct Buffer));
-	buf_init(sh->items[i]);
-    }
-    return true;
-}
-
-bool sil_history_init(struct SILHistory* sh)
-{
-    DEBUG_ASSERT(sh, "");
-    sh->size = SIL_HISTORY_INITIAL_CAPACITY;
-    sh->items = malloc(SIL_HISTORY_INITIAL_CAPACITY * sizeof(struct Buffer));
-    if (!sh->items) return false;
-    for (uint16 i = 0; i < SIL_HISTORY_INITIAL_CAPACITY; ++i) {
-	sh->items[i] = malloc(sizeof(struct Buffer));
-	buf_init(sh->items[i]);
-    }
-    sh->size = 0;
-    return true;
-}
-
-NoRet sil_history_deinit(struct SILHistory* sh)
-{
-    DEBUG_ASSERT(sh, "");
-    for (uint16 i = 0; i < sh->size; ++i) {
-	buf_deinit(sh->items[i]);
-	free(sh->items[i]);
-    }
-    free(sh->items);
-}
+/*******************/
+/* History helpers */
+/*******************/
 
 NoRet sil_history_next(struct SILState* ss)
 {
@@ -163,23 +67,27 @@ bool sil_add_completion(
 
 NoRet sil_move_cursor_pos_left(struct SILState* ss)
 {
+    DEBUG_ASSERT(ss, "");
     if (ss->cursor_pos == 0) return;
     --ss->cursor_pos;
 }
 
 NoRet sil_move_cursor_pos_right(struct SILState* ss)
 {
+    DEBUG_ASSERT(ss, "");
     if (ss->cursor_pos >= ss->buffer->len) return;
     ++ss->cursor_pos;
 }
 
 NoRet sil_move_cursor_pos_to_beg(struct SILState* ss)
 {
+    DEBUG_ASSERT(ss, "");
     ss->cursor_pos = 0;
 }
 
 NoRet sil_move_cursor_pos_to_end(struct SILState* ss)
 {
+    DEBUG_ASSERT(ss, "");
     ss->cursor_pos = ss->buffer->len;
 }
 
@@ -208,8 +116,9 @@ bool sil_clear_screen(struct SILState* ss)
     buf_deinit(&buf);
 }
 
-bool sil_refresh(struct SILState* ss)
+bool sil_refresh_line(struct SILState* ss)
 {
+    /* Initializing the temporary buffer */
     struct Buffer buf;
     if (!buf_init(&buf)) return false;
 
@@ -233,12 +142,28 @@ bool sil_refresh(struct SILState* ss)
     snprintf(
 	seq, 64,
 	"\r\x1b[%dC",
-	ss->prompt_len + ss->cursor_pos);
+	ss->prompt_actual_len + ss->cursor_pos);
     if (!buf_append(&buf, seq, strlen(seq)))
 	return false;
-    write(ss->ofd, buf.val, buf.len + 1);
+    write(ss->ofd, buf.val, buf.len);
 
+    /* Deinitializing the temporary buffer */
     buf_deinit(&buf);
+}
+
+static uint64 __calc_len_of_esc_str(
+    const char const* str,
+    const uint64 len)
+{
+    uint64 res = 0;
+    for (uint64 i = 0; i < len; ++i) {
+	if (str[i] == '\033') {
+	    while (str[i] != 'm') ++i;
+	    continue;
+	}
+	++res;
+    }
+    return res;
 }
 
 bool sil_init(
@@ -250,13 +175,16 @@ bool sil_init(
     ss->history_pos = 0;
     ss->buffer = ss->history.items[0];
     ss->config.prompt = prompt;
+
     ss->prompt_len = strlen(prompt);
+    ss->prompt_actual_len = __calc_len_of_esc_str(prompt, ss->prompt_len);
+
     for (uint16 i = 0; i < SIL_MAX_CALLBACKS; ++i)
 	ss->config.callbacks[i] = NULL;
     sil_move_cursor_pos_to_beg(ss);
     ss->ifd = 0;
     ss->ofd = 1;
-    if (!init_term(ss)) return false;
+    if (!term_init(ss->ifd)) return false;
 
     ss->completions_size = 64;
     ss->completions_count = 0;
@@ -276,7 +204,7 @@ bool sil_init(
 bool sil_deinit(struct SILState* ss)
 {
     sil_history_deinit(&ss->history);
-    restore_term(ss);
+    term_restore(ss->ifd);
 }
 
 char* sil_read(struct SILState* ss)
@@ -284,16 +212,20 @@ char* sil_read(struct SILState* ss)
     int res;
     uint16 key;
     SILCallbackStatus cs;
-    sil_refresh(ss);
+    sil_refresh_line(ss);
     while (true) {
 	res = read(ss->ifd, &key, 1);
 	if (res == 0) continue;
 	if (res == -1) return NULL;
 	if (sil_key_is_binded(ss, key)) {
+	    write(ss->ofd, "\r", 1);
 	    cs = ss->config.callbacks[key](ss);
+	    sil_refresh_line(ss);
 	    switch (cs) {
 		case SILCS_CONTINUE: continue;
-		case SILCS_RET_RES: return ss->res;
+		case SILCS_RET_RES:
+		    write(ss->ofd, "\r", 1);
+		    return ss->res;
 		case SILCS_ERROR: return NULL;
 		default: UNLIKELY();
 	    }
@@ -314,15 +246,20 @@ char* sil_read(struct SILState* ss)
 
 #include <assert.h>
 
-static NoRet test_sil_history(void)
+static NoRet test_calc_len_of_esc_str(void)
 {
+    char* a = "\033[38;5;226mhello\033[0m";
+    assert(__calc_len_of_esc_str(a, strlen(a)) == 5);
+
+    char* b = "\033[38;5;226mmoooo\033[0m";
+    assert(__calc_len_of_esc_str(a, strlen(b)) == 5);
 }
 
 NoRet test_sil(void)
 {
     printf("Running tests:\n");
-    test_sil_history();
-    printf("test_sil_history(): PASSED\n");
+    test_calc_len_of_esc_str();
+    printf("test_calc_len_of_esc_str(): PASSED\n");
 }
 
 #endif // TEST

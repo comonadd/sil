@@ -26,6 +26,7 @@
 #define CAST(a, type) (type)a
 #define UNUSED(a) CAST(a, void)
 #define STREQ(a, b) (strcmp(a, b) == 0)
+#define STREQ_CI(a, b) (strcasecmp(a, b) == 0)
 
 #if DEBUG
 #  define UNLIKELY() assert(0)

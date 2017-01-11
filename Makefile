@@ -35,7 +35,7 @@ CCWARN_FLAGS := \
 CCOPTIMIZATION_FLAGS := -O0
 CCDEFINITIONS := \
 	-DTEST=$(TEST) -DDEBUG=$(DEBUG)
-CCINCLUDES := -I$(ROOT_DIR)/src
+CCINCLUDES := -I$(ROOT_DIR)/src/
 
 CCFLAGS := $(CCSTD) $(CCWARN_FLAGS) $(CCOPTIMIZATION_FLAGS) $(CCDEFINITIONS) $(CCINCLUDES) \
 	-fno-omit-frame-pointer -ffloat-store -fno-common -fstrict-aliasing \
@@ -50,10 +50,17 @@ endif
 #############
 
 LIB_SRC_PATH := $(ROOT_DIR)/src
-EXAMPLE_SRC_PATH := $(ROOT_DIR)/example
+LIB_NAME := $(OUTPUT_DIR)/libsil.a
 
-LIB_PATH := $(OUTPUT_DIR)/libsil.a
-EXAMPLE_PATH := $(OUTPUT_DIR)/example
+EXAMPLES_SRC_PATH := $(ROOT_DIR)/examples
+BASIC_EXAMPLE_NAME := $(OUTPUT_DIR)/example_basic
+KEYBINDINGS_EXAMPLE_NAME := $(OUTPUT_DIR)/example_keybindings
+COMPLETIONS_EXAMPLE_NAME := $(OUTPUT_DIR)/example_completions
+
+EXAMPLES := \
+	$(BASIC_EXAMPLE_NAME) \
+	$(KEYBINDINGS_EXAMPLE_NAME) \
+	$(COMPLETIONS_EXAMPLE_NAME)
 
 export
 
@@ -61,15 +68,19 @@ export
 ### Targets ###
 ###############
 
-all: $(LIB_PATH)
+all: library
 
-example: $(EXAMPLE_PATH)
+library: $(LIB_NAME)
+.PHONY: library
 
-$(LIB_PATH): $(LIB_SRC_PATH)
+$(LIB_NAME): $(LIB_SRC_PATH)
 	+$(MAKE) -C $^
 
-$(EXAMPLE_PATH): $(EXAMPLE_SRC_PATH)
-	+$(MAKE) -C $^
+examples: $(EXAMPLES) $(LIB_NAME)
+.PHONY: examples
+
+$(EXAMPLES): $(EXAMPLES_SRC_PATH) $(LIB_NAME)
+	+$(MAKE) -C $(EXAMPLES_SRC_PATH)
 
 clean:
 	@find . -name "*.o" -type f -delete
@@ -80,5 +91,5 @@ clean:
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.d.tmp" $(RESET_CLR)
 	@find . -name "*.a" -type f -delete
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.a" $(RESET_CLR)
-	rm -rf tmp/example
+	rm -rf $(BASIC_EXAMPLE_NAME) $(KEYBINDINGS_EXAMPLE_NAME) $(COMPLETIONS_EXAMPLE_NAME)
 .PHONY: clean
