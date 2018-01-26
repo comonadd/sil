@@ -4,16 +4,22 @@
 
 SRC := $(shell find . -type f -name '*.c')
 OBJ := $(SRC:.c=.o)
+OBJ_FPIC := $(OBJ:.o=.o.fpic)
 
-all: $(LIB_NAME)
+all: $(LIB_SHARED_NAME) $(LIB_STATIC_NAME)
 
-$(LIB_NAME): $(OBJ)
+$(LIB_SHARED_NAME): $(OBJ_FPIC)
+	@echo -e $(YELLOW_CLR) "LD " $(GRAY_CLR) $@ $(RESET_CLR)
+	@$(CC) $(CCFLAGS) -o $@ -shared $^
+
+$(LIB_STATIC_NAME): $(OBJ)
 	@echo -e $(YELLOW_CLR) "AR " $(GRAY_CLR) $@ $(RESET_CLR)
-	@ar -rcs $@ $^
+	@$(AR) rcs $@ $^
 
-%.o: %.c
+%.o %.o.fpic: %.c
 	@echo -e $(YELLOW_CLR) "CC " $(GRAY_CLR) $*.c $(RESET_CLR)
-	@$(CC) -c $(CCFLAGS) $*.c -o $*.o
+	@$(CC) -c -fpic $(CCFLAGS) -o $*.o.fpic $*.c
+	@$(CC) -c $(CCFLAGS) -o $*.o $*.c
 	@$(CC) -MM $(CCFLAGS) $*.c > $*.d
 	@mv -f $*.d $*.d.tmp
 	@sed -e 's|.*:|$*.o:|' < $*.d.tmp > $*.d

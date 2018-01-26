@@ -16,12 +16,18 @@ DEBUG := 1
 ### Linker setup ###
 ####################
 
-LD := gcc
+
+LD := ld
 LDFLAGS := -lc
 
 ########################
 ### C Compiler setup ###
 ########################
+
+ifeq ($(DEBUG), 1)
+CCDEBUG_FLAGS := -g -ggdb
+CCOPTIMIZATION_FLAGS := -O0
+endif
 
 CC := gcc
 CCSTD := -std=gnu99 -pedantic
@@ -32,35 +38,24 @@ CCWARN_FLAGS := \
 	-Wundef -Wnested-externs -Wshadow -Wunreachable-code \
 	-Wlogical-op -Wfloat-equal -Wstrict-aliasing=2 -Wredundant-decls \
 	-Wold-style-definition -Werror
-CCOPTIMIZATION_FLAGS := -O0
-CCDEFINITIONS := \
-	-DTEST=$(TEST) -DDEBUG=$(DEBUG)
-CCINCLUDES := -I$(ROOT_DIR)/src/
+CCOPTIMIZATION_FLAGS ?= -O2
+CCDEFINITIONS := -DTEST=$(TEST) -DDEBUG=$(DEBUG)
+CCINCLUDES := -I$(ROOT_DIR)/src
 
-CCFLAGS := $(CCSTD) $(CCWARN_FLAGS) $(CCOPTIMIZATION_FLAGS) $(CCDEFINITIONS) $(CCINCLUDES) \
-	-fno-omit-frame-pointer -ffloat-store -fno-common -fstrict-aliasing \
-	-lm
-
-ifeq ($(DEBUG), 1)
-CCFLAGS += -g -ggdb
-endif
+CCFLAGS := $(CCSTD) $(CCWARN_FLAGS) $(CCDEBUG_FLAGS) $(CCOPTIMIZATION_FLAGS) $(CCDEFINITIONS) $(CCINCLUDES) \
+	-fno-omit-frame-pointer -ffloat-store -fno-common -fstrict-aliasing
 
 #############
 ### Paths ###
 #############
 
 LIB_SRC_PATH := $(ROOT_DIR)/src
-LIB_NAME := $(OUTPUT_DIR)/libsil.a
+LIB_SHARED_NAME := $(OUTPUT_DIR)/libsil.so
+LIB_STATIC_NAME := $(OUTPUT_DIR)/libsil.a
 
-EXAMPLES_SRC_PATH := $(ROOT_DIR)/examples
 BASIC_EXAMPLE_NAME := $(OUTPUT_DIR)/example_basic
 KEYBINDINGS_EXAMPLE_NAME := $(OUTPUT_DIR)/example_keybindings
 COMPLETIONS_EXAMPLE_NAME := $(OUTPUT_DIR)/example_completions
-
-EXAMPLES := \
-	$(BASIC_EXAMPLE_NAME) \
-	$(KEYBINDINGS_EXAMPLE_NAME) \
-	$(COMPLETIONS_EXAMPLE_NAME)
 
 export
 
@@ -70,26 +65,23 @@ export
 
 all: library
 
-library: $(LIB_NAME)
+library:
+	+$(MAKE) -C $(LIB_SRC_PATH)
 .PHONY: library
 
-$(LIB_NAME): $(LIB_SRC_PATH)
-	+$(MAKE) -C $^
-
-examples: $(EXAMPLES) $(LIB_NAME)
+examples: library
+	+$(MAKE) -C examples
 .PHONY: examples
-
-$(EXAMPLES): $(EXAMPLES_SRC_PATH) $(LIB_NAME)
-	+$(MAKE) -C $(EXAMPLES_SRC_PATH)
 
 clean:
 	@find . -name "*.o" -type f -delete
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.o" $(RESET_CLR)
+	@find . -name "*.o.fpic" -type f -delete
+	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.o.fpic" $(RESET_CLR)
 	@find . -name "*.d" -type f -delete
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.d" $(RESET_CLR)
 	@find . -name "*.d.tmp" -type f -delete
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.d.tmp" $(RESET_CLR)
 	@find . -name "*.a" -type f -delete
-	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.a" $(RESET_CLR)
-	rm -rf $(BASIC_EXAMPLE_NAME) $(KEYBINDINGS_EXAMPLE_NAME) $(COMPLETIONS_EXAMPLE_NAME)
+	@rm -rf $(LIB_SHARED_NAME) $(LIB_STATIC_NAME) $(BASIC_EXAMPLE_NAME) $(KEYBINDINGS_EXAMPLE_NAME) $(COMPLETIONS_EXAMPLE_NAME)
 .PHONY: clean

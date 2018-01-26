@@ -3,48 +3,22 @@
 /* Creator: Dmitry Guzeev <dmitry.guzeev@yahoo.com> */
 /* Description: */
 
-#ifndef HISTORY_H
-#define HISTORY_H
+#ifndef SIL_HISTORY_H
+#define SIL_HISTORY_H
 
-#include "types.h"
-#include "buffer.h"
+#include "lib/types.h"
+#include "lib/buffer.h"
+#include "sil.h"
 
-/**
-   @items - items of history
-   @size - count of items that we allocated buffers for
-**/
-struct SILHistory {
-    struct Buffer** items;
-    uint16 size;
-};
+bool sil_history_at_end(struct SILState* ss);
+bool sil_history_at_beg(struct SILState* ss);
+bool sil_history_grow(struct SILState* ss);
+bool sil_history_init(struct SILState* ss);
+NoRet sil_history_deinit(struct SILState* ss);
+NoRet sil_history_new_item(struct SILState* ss);
+NoRet sil_history_next(struct SILState* ss);
+NoRet sil_history_prev(struct SILState* ss);
+NoRet sil_history_beg(struct SILState* ss);
+NoRet sil_history_end(struct SILState* ss);
 
-/**
-   $ Description:
-   #   This function grows the array of items of the history
-   $ Return value:
-   #   Returns true if succeeds
-   #   Returns false only if there is no enough memory
-**/
-bool sil_history_grow(struct SILHistory* sh);
-
-/**
-   $ Description:
-   #   This function initializes history and
-   #   initializes all the buffers in it
-   $ Return value:
-   #   Returns true if succeeds
-   #   Returns false if there is not enough memory
-**/
-bool sil_history_init(struct SILHistory* sh);
-
-/**
-   $ Description:
-   #   This function deinitializes the history,
-   #   and frees all the buffers in it
-   $ Return value:
-   #   Always succeeds, so there is no reasons to return
-   #   anything
-**/
-NoRet sil_history_deinit(struct SILHistory* sh);
-
-#endif // HISTORY_H
+#endif /* SIL_HISTORY_H */

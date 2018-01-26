@@ -1,5 +1,5 @@
 /* File: macros.h */
-/* Creation Date: 2017-01-10*/
+/* Creation Date: 2017-01-10 */
 /* Creator: Dmitry Guzeev <dmitry.guzeev@yahoo.com> */
 /* Description: */
 
@@ -11,10 +11,13 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#define PTR_SIZE sizeof(void*)
+
 #define ZERO_CH '\0'
 #define CR_CH '\r'
 #define LF_CH '\n'
 #define CRLF "\r\n"
+#define SPACE_CH ' '
 
 #define CLEAR_SCREEN_SEQ "\x1b[H\x1b[2J"
 #define CLEAR_SCREEN_SEQ_LEN 7
@@ -33,18 +36,19 @@
 #  define DEBUG_ASSERT(cond, msg) do {					\
 	if (!(cond)) {							\
 	    printf("[%s:%d] Assertion failed (%s): %s\n", __FILE__, __LINE__, #cond, msg); \
-	    exit(0);\
-	}					\
+	    exit(0);							\
+	}								\
     } while (0);
 #  define DEBUG_ASSERT_IF(cond, cond_if, msg) do {			\
 	if ((cond_if) && !(cond)) {					\
 	    printf("[%s:%d] Assertion failed ((%s) && (%s)): %s\n", __FILE__, __LINE__, #cond_if, #cond, msg); \
-	    exit(0);\
+	    exit(0);							\
 	}								\
     } while (0)
 #else
+#  define UNLIKELY()
 #  define DEBUG_ASSERT(cond, msg)
 #  define DEBUG_ASSERT_IF(cond, cond_if, msg)
-#endif // DEBUG
+#endif /* DEBUG */
 
-#endif // MACROS_H
+#endif /* MACROS_H */

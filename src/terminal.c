@@ -11,10 +11,10 @@
 #include <termios.h>
 #include <errno.h>
 
-#include "types.h"
-#include "macros.h"
+#include "lib/types.h"
+#include "lib/macros.h"
 
-static char* unsupported_terminals[] = {"emacs"};
+static char* unsupported_terminals[] = {"emacs", "dumb", NULL};
 static struct termios saved_termios;
 
 bool term_is_supported(void)
@@ -27,7 +27,7 @@ bool term_is_supported(void)
     return true;
 }
 
-bool term_init(int fd)
+bool term_enable_raw_mode(const int fd)
 {
     if (!isatty(STDIN_FILENO)) goto fatal;
     if (tcgetattr(fd, &saved_termios) == -1)
@@ -39,13 +39,17 @@ bool term_init(int fd)
     /* input modes: no break, no CR to NL, no parity check, no strip char,
      * no start/stop output control. */
     curr_termios.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+
     /* output modes - disable post processing */
     curr_termios.c_oflag &= ~(OPOST);
+
     /* control modes - set 8 bit chars */
     curr_termios.c_cflag |= (CS8);
+
     /* local modes - choing off, canonical off, no extended functions,
      * no signal chars (^Z,^C) */
     curr_termios.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+
     /* control chars - set return condition: min number of bytes and timer.
      * We want read to return every single byte, without timeout. */
     /* 1 byte, no timer */
@@ -62,7 +66,7 @@ fatal:
     return false;
 }
 
-bool term_restore(int fd)
+bool term_disable_raw_mode(const int fd)
 {
     tcsetattr(fd, TCSAFLUSH, &saved_termios);
     return true;
