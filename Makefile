@@ -65,13 +65,16 @@ export
 
 all: library
 
-library:
+library: $(OUTPUT_DIR)
 	+$(MAKE) -C $(LIB_SRC_PATH)
 .PHONY: library
 
-examples: library
+examples: $(OUTPUT_DIR) library
 	+$(MAKE) -C examples
 .PHONY: examples
+
+$(OUTPUT_DIR):
+	mkdir -p $(OUTPUT_DIR)
 
 clean:
 	@find . -name "*.o" -type f -delete
