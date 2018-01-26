@@ -65,13 +65,16 @@ export
 
 all: library
 
-library:
+library: $(OUTPUT_DIR)
 	+$(MAKE) -C $(LIB_SRC_PATH)
 .PHONY: library
 
-examples: library
+examples: $(OUTPUT_DIR) library
 	+$(MAKE) -C examples
 .PHONY: examples
+
+$(OUTPUT_DIR):
+	mkdir -p $(OUTPUT_DIR)
 
 clean:
 	@find . -name "*.o" -type f -delete
@@ -83,5 +86,9 @@ clean:
 	@find . -name "*.d.tmp" -type f -delete
 	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.d.tmp" $(RESET_CLR)
 	@find . -name "*.a" -type f -delete
-	@rm -rf $(LIB_SHARED_NAME) $(LIB_STATIC_NAME) $(BASIC_EXAMPLE_NAME) $(KEYBINDINGS_EXAMPLE_NAME) $(COMPLETIONS_EXAMPLE_NAME)
+	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.a" $(RESET_CLR)
+	@find . -name "*.so" -type f -delete
+	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "*.so" $(RESET_CLR)
+	@rm -rf $(OUTPUT_DIR)
+	@echo -e $(YELLOW_CLR) "CLEAN " $(GRAY_CLR) "$(OUTPUT_DIR)" $(RESET_CLR)
 .PHONY: clean
